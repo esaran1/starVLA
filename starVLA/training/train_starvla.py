@@ -47,8 +47,15 @@ from starVLA.model.framework.share_tools import apply_config_compat
 from starVLA.training.trainer_utils.config_tracker import AccessTrackedConfig, wrap_config
 from starVLA.training.trainer_utils.trainer_tools import TrainerUtils, build_param_lr_groups, setup_optimizer_and_scheduler, normalize_dotlist_args
 
-deepspeed_plugin = DeepSpeedPlugin()
-accelerator = Accelerator(deepspeed_plugin=deepspeed_plugin)
+# DeepSpeed is the default, but it is opt-out via STARVLA_DISABLE_DEEPSPEED=1.
+# On a single GPU ZeRO shards nothing across one rank, and importing deepspeed
+# hard-fails when no CUDA toolkit is present ("CUDA_HOME does not exist"), which
+# is the normal case for a pip/conda torch install with no system nvcc.
+if os.environ.get("STARVLA_DISABLE_DEEPSPEED", "0") == "1":
+    accelerator = Accelerator()
+else:
+    deepspeed_plugin = DeepSpeedPlugin()
+    accelerator = Accelerator(deepspeed_plugin=deepspeed_plugin)
 accelerator.print(accelerator.state)
 
 # Sane Defaults
@@ -88,14 +95,32 @@ def prepare_data(cfg, accelerator, output_dir) -> DataLoader:
 def setup_optimizer_and_scheduler(model, cfg) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
     """Set optimizer and scheduler."""
     param_groups = build_param_lr_groups(model=model, cfg=cfg)
-    optimizer = torch.optim.AdamW(
-        param_groups,
+    # `trainer.optimizer.name` selects the implementation. Default stays
+    # torch.optim.AdamW(fused=True) so existing configs are unaffected.
+    #
+    # paged_adamw_8bit keeps 8-bit optimizer states (paged to host RAM under
+    # pressure) instead of fp32. For a 2.17B-param full fine-tune that is the
+    # difference between 17.4 GB of optimizer state and ~4.3 GB, i.e. between
+    # OOM and fitting on a 16 GB card.
+    optim_name = str(getattr(cfg.trainer.optimizer, "name", "AdamW") or "AdamW").lower()
+    optim_kwargs = dict(
         lr=cfg.trainer.learning_rate.base,
         betas=tuple(cfg.trainer.optimizer.betas),
         weight_decay=cfg.trainer.optimizer.weight_decay,
         eps=cfg.trainer.optimizer.eps,
-        fused=True,
     )
+    if optim_name in ("paged_adamw_8bit", "pagedadamw8bit"):
+        try:
+            from bitsandbytes.optim import PagedAdamW8bit
+        except ImportError as exc:  # pragma: no cover - depends on local env
+            raise ImportError(
+                "trainer.optimizer.name=paged_adamw_8bit requires bitsandbytes "
+                "(`pip install bitsandbytes`)."
+            ) from exc
+        optimizer = PagedAdamW8bit(param_groups, **optim_kwargs)
+        logger.info("Using bitsandbytes PagedAdamW8bit (8-bit optimizer states).")
+    else:
+        optimizer = torch.optim.AdamW(param_groups, fused=True, **optim_kwargs)
 
     if dist.is_initialized() and dist.get_rank() == 0:
         for group in optimizer.param_groups:

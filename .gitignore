@@ -248,6 +248,11 @@ wandb/*
 !docs/starVLA_guideline.md
 !docs/WM4A.md
 
+# G1 long-horizon: interface contracts consumed by RLinf / IsaacLab.
+# These are handoff artifacts, not scratch notes — they must be tracked.
+!examples/realRobots/G1InspirePistonLongHorizon/ACTION_CONTRACT.md
+!examples/realRobots/G1InspirePistonLongHorizon/REFERENCE_COMPARISON.md
+
 
 logs/*
 bar

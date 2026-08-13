@@ -1,0 +1,96 @@
+{
+  "_comment": "Machine-readable handoff contract for RLinf / IsaacLab. Authoritative prose: ACTION_CONTRACT.md. Do not edit one without the other.",
+  "_status": "SFT pipeline validated end-to-end; the checkpoint below is a 20-step SMOKE artifact, NOT a trained policy. Replace checkpoint_path after a real SFT run.",
+
+  "framework": "QwenOFT",
+  "base_vlm": "Qwen/Qwen3-VL-2B-Instruct",
+  "base_vlm_local_path": "/home/jren313/research/starvla_rl/pretrained/Qwen3-VL-2B-Instruct",
+  "attn_implementation": "sdpa",
+
+  "checkpoint_path": null,
+  "checkpoint_path_note": "No trained checkpoint exists yet. The 20-step smoke run wrote final_model/pytorch_model.pt (4.2 GB) and it was DELETED afterwards per checkpoint-retention discipline - it had no policy value. A real SFT run writes to <run_dir>/final_model/pytorch_model.pt; set this field then.",
+  "checkpoint_is_smoke_test": true,
+  "run_dir": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-smoke",
+  "dataset_statistics_path": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-smoke/dataset_statistics.json",
+
+  "action_dim": 30,
+  "action_horizon": 30,
+  "state_dim": 0,
+  "state_enabled": false,
+  "state_available_but_disabled_dim": 29,
+
+  "action_normalization_key": "new_embodiment",
+  "action_normalization_mode": "q99",
+  "action_normalization_clamp": [-2.2, 2.2],
+  "degenerate_action_dims": [14, 15, 16, 17, 18, 19, 26, 27, 28, 29],
+  "degenerate_dims_note": "q01 == q99 for these; Normalizer.forward passes them through UNNORMALIZED (raw units). Model output for these dims is already physical, not in [-1,1].",
+
+  "camera_keys": ["observation.images.ego_view"],
+  "camera_order": ["ego_view"],
+  "camera_count": 1,
+  "image_preprocessing": {
+    "native_resolution": [240, 424],
+    "training_resolution": [224, 224],
+    "resize": "non-aspect-preserving to 224x224",
+    "format": "RGB uint8 HWC",
+    "color_jitter_train_only": {"brightness": 0.3, "contrast": 0.4, "saturation": 0.5, "hue": 0.08}
+  },
+
+  "control_frequency_hz": 50,
+  "action_semantics": "absolute joint position targets",
+  "action_mode": "abs",
+  "action_type": "abs_qpos",
+  "controller_expectation": "downstream PD position controller tracks these targets",
+  "execution_semantics": "predict 30 absolute targets (0.6 s), execute open-loop, then re-plan",
+
+  "action_slices": {
+    "left_arm":         {"start": 0,  "end": 7,  "units": "rad"},
+    "right_arm":        {"start": 7,  "end": 14, "units": "rad"},
+    "left_hand":        {"start": 14, "end": 20, "units": "rad", "note": "Inspire 6-DoF; CONSTANT in this dataset"},
+    "right_hand":       {"start": 20, "end": 26, "units": "rad", "note": "Inspire 6-DoF"},
+    "base_height":      {"start": 26, "end": 27, "units": "m",   "note": "CONSTANT 0.76 in this dataset"},
+    "navigate_command": {"start": 27, "end": 30, "units": "m/s, m/s, rad/s", "note": "vx, vy, vyaw; ALL ZERO in this dataset (stationary task)"}
+  },
+
+  "state_slices_if_enabled": {
+    "left_arm":   {"start": 0,  "end": 7,  "units": "rad"},
+    "right_arm":  {"start": 7,  "end": 14, "units": "rad"},
+    "left_hand":  {"start": 14, "end": 20, "units": "rad"},
+    "right_hand": {"start": 20, "end": 26, "units": "rad"},
+    "waist":      {"start": 26, "end": 29, "units": "rad"}
+  },
+  "state_raw_key": "observation.state",
+  "state_raw_dim": 63,
+  "state_unmapped_note": "observation.state[29:63] is 34 tactile channels, IDENTICALLY ZERO in all 45938 frames. Excluded.",
+
+  "language_key": "annotation.human.task_description",
+  "language_original_key": "task_index",
+  "task_string": "pick up the piston with the right hand, inject it into the tube held by the left hand, then move it over the hole plate.",
+
+  "dataset": "birbirll/g1-inspire-piston-longhorizon",
+  "dataset_revision": "80fb5a0bbcaf806f5b2cc848fc722f8e005a6830",
+  "dataset_local_path": "/home/jren313/research/starvla_rl/data/g1-inspire-piston-longhorizon",
+  "dataset_episodes": 67,
+  "dataset_frames": 45938,
+  "dataset_origin": "IsaacLab replay of piston CSV trajectories (replay_piston_csv.py); all episodes success=true",
+
+  "starvla_commit": "0ed0aad2c83f587714f6167ef60cf7218b786590",
+  "starvla_branch": "g1-longhorizon-oft",
+
+  "server_protocol": {
+    "_note": "Per the reference checkpoint README; NOT verified in this pass - no deployment run was performed.",
+    "entrypoint": "deployment/model_server/server_policy.py",
+    "transport": "WebSocket, msgpack-numpy",
+    "request": {"examples": [{"image": ["rgb_hwc_uint8"], "lang": "<task string>"}], "unnorm_key": "new_embodiment"},
+    "response": {"data": {"actions": "[B, 30, 30]"}},
+    "output_units": "absolute physical units after de-normalization",
+    "known_issue": "upstream PolicyNormProcessor may raise 'Video key ego_view not found' for data configs with video augmentation (ours has it); the reference ships policy_norm_processor_PATCHED.py. UNVERIFIED here."
+  },
+
+  "unresolved": [
+    "No closed-loop evaluation was performed. No policy-quality claim is made.",
+    "Deployment/policy server was not exercised; the PolicyNormProcessor video-augmentation bug is unverified on this checkout.",
+    "Whether the RLinf/IsaacLab controller requires proprioceptive state input. If yes, wire StateActionDropout before enabling state.",
+    "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT."
+  ]
+}

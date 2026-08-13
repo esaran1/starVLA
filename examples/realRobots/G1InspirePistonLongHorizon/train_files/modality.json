@@ -1,0 +1,35 @@
+{
+  "_comment": "G1 + Inspire piston LONG-HORIZON - gr00t modality schema. Copy to meta/modality.json of the LeRobot dataset.",
+  "_critical": "annotation.human.task_description.original_key MUST be 'task_index' (int64 column indexing meta/tasks.jsonl).",
+  "_annotation_key_note": "The annotation subkey is FLAT ('human.task_description'). schema.py:get_key_meta looks up everything after 'annotation.' verbatim. The nested {human:{task_description:...}} form in docs/agent_skills/integrate-starvla-dataset/assets/templates/modality.json does NOT work with this loader. Only top-level underscore keys are tolerated by the pydantic model.",
+  "_state_note": "observation.state is 63-D: [0:29] arm/hand/waist proprio, [29:63] tactile. Tactile is IDENTICALLY ZERO across all 45938 frames in this dataset and is therefore NOT mapped.",
+
+  "video": {
+    "ego_view": {
+      "original_key": "observation.images.ego_view"
+    }
+  },
+
+  "state": {
+    "left_arm":   {"start": 0,  "end": 7,  "original_key": "observation.state", "absolute": true, "dtype": "float32"},
+    "right_arm":  {"start": 7,  "end": 14, "original_key": "observation.state", "absolute": true, "dtype": "float32"},
+    "left_hand":  {"start": 14, "end": 20, "original_key": "observation.state", "absolute": true, "dtype": "float32"},
+    "right_hand": {"start": 20, "end": 26, "original_key": "observation.state", "absolute": true, "dtype": "float32"},
+    "waist":      {"start": 26, "end": 29, "original_key": "observation.state", "absolute": true, "dtype": "float32"}
+  },
+
+  "action": {
+    "left_arm":         {"start": 0,  "end": 7,  "original_key": "action", "absolute": true, "dtype": "float32"},
+    "right_arm":        {"start": 7,  "end": 14, "original_key": "action", "absolute": true, "dtype": "float32"},
+    "left_hand":        {"start": 14, "end": 20, "original_key": "action", "absolute": true, "dtype": "float32"},
+    "right_hand":       {"start": 20, "end": 26, "original_key": "action", "absolute": true, "dtype": "float32"},
+    "base_height":      {"start": 26, "end": 27, "original_key": "action", "absolute": true, "dtype": "float32"},
+    "navigate_command": {"start": 27, "end": 30, "original_key": "action", "absolute": true, "dtype": "float32"}
+  },
+
+  "annotation": {
+    "human.task_description": {
+      "original_key": "task_index"
+    }
+  }
+}

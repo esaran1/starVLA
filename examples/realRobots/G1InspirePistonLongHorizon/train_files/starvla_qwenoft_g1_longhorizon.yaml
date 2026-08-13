@@ -1,0 +1,101 @@
+# G1 + Inspire piston LONG-HORIZON — QwenOFT SFT config.
+#
+# Target hardware: single NVIDIA RTX 4080 (16 GB).  The reference G1 piston
+# checkpoint (birbirll/g1-inspire-piston-starvla-oft) was trained on a 24 GB
+# RTX 4090 with per_device_batch_size 8; that does NOT fit here. Batch size and
+# accumulation below are set for 16 GB — see docs/ACTION_CONTRACT.md.
+#
+# CLI overrides this file:  --trainer.learning_rate.base 1e-4
+run_id: g1-longhorizon-oft-smoke
+run_root_dir: /home/jren313/research/starvla_rl/checkpoints
+seed: 42
+wandb_entity: your_wandb_entity
+wandb_project: starVLA_g1_piston_longhorizon
+is_debug: false
+version_id: "0.21"
+
+framework:
+  name: QwenOFT
+  qwenvl:
+    # Qwen3-VL-2B: the smallest Qwen VL the working QWen3 interface supports.
+    # (transformers 4.57.0 has no Qwen3_5ForConditionalGeneration, so the
+    # Qwen3.5 family cannot be imported by the QWen3_5 interface.)
+    base_vlm: /home/jren313/research/starvla_rl/pretrained/Qwen3-VL-2B-Instruct
+    # SDPA, not flash_attention_2: flash-attn is not installed in this env and
+    # PyTorch SDPA is sufficient. The reference checkpoint also used sdpa.
+    attn_implementation: sdpa
+    # Live grad-ckpt switch (trainer.gradient_checkpointing is dead config).
+    enable_gradient_checkpointing: true
+  action_model:
+    action_model_type: MLP
+    action_dim: 30          # left_arm7 + right_arm7 + left_hand6 + right_hand6 + base_height1 + navigate3
+    state_dim: 0            # vision+language-only: no proprio packed
+    action_horizon: 30      # == len(data_config.action_indices); future_action_window_size=29 auto-filled
+
+datasets:
+  vla_data:
+    dataset_py: lerobot_datasets
+    # Vision + language only. With state enabled on this stationary task the
+    # model regresses actions from proprioception and ignores the camera
+    # (converges in loss, fails closed-loop). StarVLA has no state-dropout to
+    # mitigate this. See docs/ACTION_CONTRACT.md "State decision".
+    include_state: false
+    data_root_dir: /home/jren313/research/starvla_rl/data
+    data_mix: unitree_g1_piston_longhorizon
+    lerobot_version: v2.0     # LeRobot v2.1 layout is read via the v2.0 code path
+    action_type: abs_qpos
+    action_mode: abs          # actions are ABSOLUTE joint position targets
+    sequential_step_sampling: false
+    per_device_batch_size: 1  # 16 GB: start at 1, raise only after measuring VRAM
+    load_all_data_for_training: true
+    obs_image_size: [224, 224]
+    delete_pause_frame: false
+    video_backend: torchvision_av
+    num_workers: 4
+
+trainer:
+  # SMOKE TEST values. Raise max_train_steps for a real run.
+  max_train_steps: 20
+  num_warmup_steps: 5
+  save_interval: 100000       # do not litter multi-GB checkpoints during smoke
+  eval_interval: 500
+  learning_rate:
+    base: 2.0e-05
+    qwen_vl_interface: 1.0e-05
+    action_model: 1.0e-04
+  lr_scheduler_type: cosine_with_min_lr
+  scheduler_specific_kwargs:
+    min_lr: 1.0e-06
+  # Full fine-tune. Freezing the VLM leaves the head learning manipulation from
+  # web-pretrained features that never adapt (QwenOFT has no projector).
+  freeze_modules: ''
+  loss_scale:
+    vla: 1.0
+    vlm: 0.1
+  max_grad_norm: 1.0
+  weight_decay: 0.0
+  logging_frequency: 1
+  gradient_clipping: 1.0
+  # NOTE: informational only — the Accelerator is built at module import, before
+  # cfg loads, so accumulation is supplied via ACCELERATE_GRADIENT_ACCUMULATION_STEPS
+  # exported by run_train.sh. Keep the two in sync.
+  # Never use accumulation > 1 together with DeepSpeed in train_starvla.py: the
+  # trainer steps the LR scheduler per micro-batch and silently compresses the
+  # schedule. This run uses plain accelerate (no DeepSpeed) on one GPU.
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+
+  optimizer:
+    # MEASURED on this 16 GB RTX 4080 (see ACTION_CONTRACT / final report):
+    #   torch fused AdamW (fp32 states) -> OOM. 2.17B params need 17.36 GB of
+    #     optimizer state alone; it dies inside the first opt.step().
+    #   PagedAdamW8bit                  -> peak 8.95 GB / 15.56 GB. Fits.
+    # Upstream hardcoded fused AdamW and ignored this field; a minimal opt-in
+    # patch in starVLA/training/train_starvla.py now honours `name`.
+    # Requires: pip install bitsandbytes
+    name: paged_adamw_8bit
+    betas: [0.9, 0.95]
+    eps: 1.0e-08
+    weight_decay: 1.0e-08
+
+  save_format: pt

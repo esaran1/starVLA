@@ -135,13 +135,15 @@
     "request": {"examples": [{"image": ["rgb_hwc_uint8"], "lang": "<task string>"}], "unnorm_key": "new_embodiment"},
     "response": {"data": {"actions": "[B, 30, 30]"}},
     "output_units": "absolute physical units after de-normalization",
-    "known_issue": "upstream PolicyNormProcessor may raise 'Video key ego_view not found' for data configs with video augmentation (ours has it); the reference ships policy_norm_processor_PATCHED.py. UNVERIFIED here."
+    "known_issue_RESOLVED": "PolicyNormProcessor raised 'Video key ego_view not found in dataset metadata' for data configs with video augmentation (ours has one). Reproduced against this data config, then fixed in deployment/model_server/policy_norm_processor.py (video metadata is now synthesized from data_config.video_keys + obs_image_size). Regression-tested. The reference checkpoint's policy_norm_processor_PATCHED.py drop-in is no longer needed."
   },
 
   "unresolved": [
     "No closed-loop evaluation was performed. No policy-quality claim is made.",
-    "Deployment/policy server was not exercised; the PolicyNormProcessor video-augmentation bug is unverified on this checkout.",
+    "BLOCKING closed-loop: the 12 Inspire intermediate/distal articulation DOFs (39-42,44-47,49-52) have no known coupling ratio. See isaaclab_action_mapping.UNRESOLVED_articulation_indices. Arm motion will be faithful; hand pose fidelity is not guaranteed.",
+    "BLOCKING closed-loop: the piston task's front_camera renders 105.5 deg HFOV vs the dataset's 69 deg. Requires a sim-side camera cfg change in unitree_sim_isaaclab (not applied here).",
     "Whether the RLinf/IsaacLab controller requires proprioceptive state input. If yes, wire StateActionDropout before enabling state.",
-    "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT."
+    "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT.",
+    "Control-rate mismatch: the dataset and this contract are 50 Hz; the IsaacLab piston task runs at 100 Hz (sim.dt 0.005, decimation 2). The deployment loop must resample or re-plan accordingly."
   ]
 }

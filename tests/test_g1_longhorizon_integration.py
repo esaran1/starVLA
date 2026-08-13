@@ -266,3 +266,37 @@ def test_build_dataset_metadata_video_default_is_unchanged(data_cfg):
         data_cfg.state_key_dims,
     )
     assert md.modalities.video == {}
+
+
+def test_control_rate_conversion_arithmetic(rlinf):
+    """Pin the 50 Hz -> 100 Hz zero-order-hold timing.
+
+    Regression guard for a real error: episode_length_s is simulated wall-clock
+    seconds, so 20 s of sim is 20 s of policy time under the hold. Conflating
+    env steps with policy actions previously produced a bogus "episode is too
+    short" conclusion.
+    """
+    c = rlinf["control_rate_conversion"]
+    ctrl_dt = c["simulator_sim_dt"] * c["simulator_decimation"]
+    assert ctrl_dt == 0.01 and 1 / ctrl_dt == c["simulator_hz"]
+    assert c["hold_env_steps_per_action"] == c["simulator_hz"] // c["policy_hz"] == 2
+
+    b = c["episode_budget"]
+    env_steps = b["episode_length_s"] / ctrl_dt
+    assert env_steps == b["env_steps_per_episode"] == 2000
+    acts = env_steps / c["hold_env_steps_per_action"]
+    assert acts == b["policy_actions_per_episode"] == 1000
+    # the whole point: policy seconds == sim seconds
+    assert acts * (1 / c["policy_hz"]) == b["policy_seconds_per_episode"] == b["episode_length_s"]
+
+    lo, hi = b["demo_duration_s"]
+    assert [round(lo / ctrl_dt), round(hi / ctrl_dt)] == b["env_steps_needed"]
+    assert b["env_steps_needed"][1] < b["env_steps_per_episode"], "demos must fit the budget"
+
+
+def test_action_horizon_is_not_inflated_for_the_hold(rlinf, yaml_cfg):
+    """The hold lives at the sim boundary; the policy contract stays 30 @ 50 Hz."""
+    c = rlinf["control_rate_conversion"]
+    assert c["policy_action_semantics_unchanged"] is True
+    assert rlinf["action_horizon"] == yaml_cfg.framework.action_model.action_horizon == 30
+    assert rlinf["control_frequency_hz"] == c["policy_hz"] == 50

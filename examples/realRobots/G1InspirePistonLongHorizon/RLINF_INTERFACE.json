@@ -144,6 +144,34 @@
     "BLOCKING closed-loop: the piston task's front_camera renders 105.5 deg HFOV vs the dataset's 69 deg. Requires a sim-side camera cfg change in unitree_sim_isaaclab (not applied here).",
     "Whether the RLinf/IsaacLab controller requires proprioceptive state input. If yes, wire StateActionDropout before enabling state.",
     "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT.",
-    "Control-rate mismatch: the dataset and this contract are 50 Hz; the IsaacLab piston task runs at 100 Hz (sim.dt 0.005, decimation 2). The deployment loop must resample or re-plan accordingly."
-  ]
+    "Zero-order hold (2 env steps per action) is specified but NOT implemented: there is no action-repeat mechanism in rlinf/envs/. Must be added at IsaaclabBaseEnv.chunk_step before closed-loop evaluation."
+  ],
+
+  "control_rate_conversion": {
+    "_doc": "See ISAACLAB_MAPPING.md 'Control-rate mismatch'.",
+    "policy_hz": 50,
+    "simulator_hz": 100,
+    "simulator_sim_dt": 0.005,
+    "simulator_decimation": 2,
+    "hold_env_steps_per_action": 2,
+    "method": "zero-order hold",
+    "implement_at": "RLinf/rlinf/envs/isaaclab/isaaclab_env.py::IsaaclabBaseEnv.chunk_step",
+    "do_not_implement_by": "emitting 60 actions from the policy or duplicating rows in the learned representation - that would redefine action_horizon and break this contract",
+    "policy_action_semantics_unchanged": true,
+    "episode_budget": {
+      "episode_length_s": 20.0,
+      "env_steps_per_episode": 2000,
+      "policy_actions_per_episode": 1000,
+      "policy_seconds_per_episode": 20.0,
+      "demo_duration_s": [13.1, 14.0],
+      "env_steps_needed": [1310, 1400],
+      "headroom_s": 6.0,
+      "verdict": "episode_length_s=20.0 is SUFFICIENT; do not raise it"
+    },
+    "implementer_notes": [
+      "max_episode_steps must be in ENV steps (2000), not policy actions (1000): step() increments _elapsed_steps per env step and truncates on cfg.max_episode_steps.",
+      "Workers compute n_chunk_steps = max_episode_steps // num_action_chunks (huggingface_worker.py:103, sglang_embodied_worker.py:79). With 2000 env steps and num_action_chunks=30 -> 66 chunk iterations. Keep num_action_chunks at 30; do not inflate it to 60 to fake the hold.",
+      "Accumulate reward across the 2 repeated env steps."
+    ]
+  }
 }

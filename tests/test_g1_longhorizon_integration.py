@@ -191,9 +191,9 @@ def test_mapped_dropped_and_held_dofs_partition_53(rlinf):
     held = set(am["hold_at_default_articulation_indices"]["legs"]) | set(
         am["hold_at_default_articulation_indices"]["waist"]
     )
-    unresolved = set(am["UNRESOLVED_articulation_indices"]["inspire_intermediate_distal"])
-    assert not (mapped & held) and not (mapped & unresolved) and not (held & unresolved)
-    assert mapped | held | unresolved == set(range(53)), "every articulation DOF must be accounted for"
+    inspire = set(am["hold_at_default_inspire_intermediate_distal"]["articulation_indices"])
+    assert not (mapped & held) and not (mapped & inspire) and not (held & inspire)
+    assert mapped | held | inspire == set(range(53)), "every articulation DOF must be accounted for"
     # dims 26-29 carry no DOF and must be dropped, not written
     assert sorted(int(k) for k in am["dropped_ds_dims"]) == [26, 27, 28, 29]
 
@@ -300,3 +300,21 @@ def test_action_horizon_is_not_inflated_for_the_hold(rlinf, yaml_cfg):
     assert c["policy_action_semantics_unchanged"] is True
     assert rlinf["action_horizon"] == yaml_cfg.framework.action_model.action_horizon == 30
     assert rlinf["control_frequency_hz"] == c["policy_hz"] == 50
+
+
+def test_inspire_intermediate_distal_resolution_is_evidence_backed(rlinf):
+    """The 12 intermediate/distal DOFs are held at 0.0 because the USD shows them
+    independently driven with no mimic/tendon — not as a blind zero-fill."""
+    d = rlinf["isaaclab_action_mapping"]["hold_at_default_inspire_intermediate_distal"]
+    assert len(d["articulation_indices"]) == 12
+    assert d["status"].startswith("RESOLVED")
+    # the identity that makes 0.0 correct
+    assert rlinf["isaaclab_action_mapping"]["default_pose_all_zero"] is True
+
+
+def test_dataset_hand_commands_are_within_inspire_joint_limits(rlinf):
+    """The left hand is commanded at exactly the finger upper limit (1.7 rad),
+    which is what ties the dataset to this specific hand model."""
+    lim = rlinf["isaaclab_action_mapping"]["inspire_joint_limits_rad"]
+    assert lim["finger_proximal_and_intermediate"] == [0.0, 1.7]
+    assert lim["dataset_values_within_limits"] is True

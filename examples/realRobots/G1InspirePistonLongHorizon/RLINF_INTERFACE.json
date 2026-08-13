@@ -92,9 +92,23 @@
       "legs": [0, 1, 3, 4, 6, 7, 9, 10, 13, 14, 17, 18],
       "waist": [2, 5, 8]
     },
-    "UNRESOLVED_articulation_indices": {
-      "inspire_intermediate_distal": [39, 40, 41, 42, 44, 45, 46, 47, 49, 50, 51, 52],
-      "reason": "Physically coupled to the proximal joints on the real Inspire hand, but ACTCFG actuates all 53 DOFs. No coupling ratio found in the simulator Python sources (would live in the robot USD). Writing 0.0 forces fingers straight while the proximal curls. DO NOT GUESS A RATIO."
+    "hold_at_default_inspire_intermediate_distal": {
+      "articulation_indices": [39, 40, 41, 42, 44, 45, 46, 47, 49, 50, 51, 52],
+      "status": "RESOLVED - verified against the USD the piston task loads",
+      "finding": "These are independently driven PhysicsRevoluteJoints (PhysicsDriveAPI:angular, stiffness 20.0, damping 0.01745, maxForce 50-150). An exhaustive stage scan found 0 mimic attributes and no mimic/tendon schema. They are NOT passive and NOT coupled in this asset.",
+      "resolution": "Command 0.0. With use_default_offset=True and q_default=0.0 for all 24 Inspire joints, 0.0 commands exactly the default pose.",
+      "caveat": "Fingers will curl at the proximal knuckle and stay straight at the middle joint. This is a fidelity limitation, not a correctness error: the dataset only ever commanded 6 DOF per hand, so no SFT signal exists for the other 6.",
+      "note_on_config_yaml": "The asset config.yaml records convert_mimic_joints_to_normal_joints:false, implying the source URDF had mimic joints. The converted USD that the sim loads has none, so that flag is not evidence of runtime coupling.",
+      "corroboration": "IsaacLab's own G1 Inspire task lists exactly these 24 as hand_joint_names ('All the drive and mimic joints, total 24 joints', num_hand_joints=24) and its retargeter solves all 12 per hand as independent DOFs."
+    },
+    "inspire_joint_limits_rad": {
+      "finger_proximal_and_intermediate": [0.0, 1.7],
+      "thumb_proximal_pitch": [-0.1, 0.6],
+      "thumb_proximal_yaw": [-0.1, 1.3],
+      "thumb_intermediate": [0.0, 0.8],
+      "thumb_distal": [0.0, 1.2],
+      "dataset_values_within_limits": true,
+      "note": "The dataset's left-hand constant 1.7000 rad is EXACTLY the finger upper limit (fully curled, gripping the tube), confirming the data was authored against this same hand model."
     }
   },
 
@@ -140,8 +154,8 @@
 
   "unresolved": [
     "No closed-loop evaluation was performed. No policy-quality claim is made.",
-    "BLOCKING closed-loop: the 12 Inspire intermediate/distal articulation DOFs (39-42,44-47,49-52) have no known coupling ratio. See isaaclab_action_mapping.UNRESOLVED_articulation_indices. Arm motion will be faithful; hand pose fidelity is not guaranteed.",
-    "BLOCKING closed-loop: the piston task's front_camera renders 105.5 deg HFOV vs the dataset's 69 deg. Requires a sim-side camera cfg change in unitree_sim_isaaclab (not applied here).",
+    "BLOCKING closed-loop: the piston task's front_camera renders 105.5 deg HFOV vs the dataset's 69 deg. Requires a sim-side camera cfg change in unitree_sim_isaaclab (not applied here). This is the one hard blocker for evaluation.",
+    "Fidelity caveat (not blocking): the 12 Inspire intermediate/distal DOFs are held at 0.0. Verified independently driven with no coupling in the USD, so this is the correct default, but the fingers will not curl at the middle joint.",
     "Whether the RLinf/IsaacLab controller requires proprioceptive state input. If yes, wire StateActionDropout before enabling state.",
     "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT.",
     "Zero-order hold (2 env steps per action) is specified but NOT implemented: there is no action-repeat mechanism in rlinf/envs/. Must be added at IsaaclabBaseEnv.chunk_step before closed-loop evaluation."

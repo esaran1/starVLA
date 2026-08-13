@@ -252,6 +252,8 @@ wandb/*
 # These are handoff artifacts, not scratch notes — they must be tracked.
 !examples/realRobots/G1InspirePistonLongHorizon/ACTION_CONTRACT.md
 !examples/realRobots/G1InspirePistonLongHorizon/REFERENCE_COMPARISON.md
+!examples/realRobots/G1InspirePistonLongHorizon/ISAACLAB_MAPPING.md
+!examples/realRobots/G1InspirePistonLongHorizon/CAMERA_FIX_REQUIRED.md
 
 
 logs/*

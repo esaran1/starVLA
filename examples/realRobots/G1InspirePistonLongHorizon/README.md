@@ -8,6 +8,8 @@ StarVLA integration for [`birbirll/g1-inspire-piston-longhorizon`](https://huggi
 |---|---|
 | [`ACTION_CONTRACT.md`](ACTION_CONTRACT.md) | **Source of truth.** Dataset facts, action semantics, units, normalization. |
 | [`REFERENCE_COMPARISON.md`](REFERENCE_COMPARISON.md) | Field-by-field diff against the reference G1 OFT checkpoint. |
+| [`ISAACLAB_MAPPING.md`](ISAACLAB_MAPPING.md) | 30-D → 53-D action mapping, camera mapping, and the 50→100 Hz conversion, each with cited evidence. |
+| [`CAMERA_FIX_REQUIRED.md`](CAMERA_FIX_REQUIRED.md) | **The one hard blocker for closed-loop eval** — the exact simulator camera correction, to apply outside this repo. |
 | [`RLINF_INTERFACE.json`](RLINF_INTERFACE.json) | Machine-readable handoff contract for RLinf / IsaacLab. |
 
 ## Layout

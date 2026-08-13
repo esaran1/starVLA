@@ -1,17 +1,46 @@
 {
   "_comment": "Machine-readable handoff contract for RLinf / IsaacLab. Authoritative prose: ACTION_CONTRACT.md. Do not edit one without the other.",
-  "_status": "SFT pipeline validated end-to-end; the checkpoint below is a 20-step SMOKE artifact, NOT a trained policy. Replace checkpoint_path after a real SFT run.",
+  "_status": "SFT COMPLETE. 10,000 steps at effective batch 32, finished cleanly in 6h22m with no NaN/OOM. Final action L1 loss 0.046 (from 0.296). NOT closed-loop evaluated - no policy-quality claim is made.",
 
   "framework": "QwenOFT",
   "base_vlm": "Qwen/Qwen3-VL-2B-Instruct",
   "base_vlm_local_path": "/home/jren313/research/starvla_rl/pretrained/Qwen3-VL-2B-Instruct",
   "attn_implementation": "sdpa",
 
-  "checkpoint_path": null,
-  "checkpoint_path_note": "No trained checkpoint exists yet. The 20-step smoke run wrote final_model/pytorch_model.pt (4.2 GB) and it was DELETED afterwards per checkpoint-retention discipline - it had no policy value. A real SFT run writes to <run_dir>/final_model/pytorch_model.pt; set this field then.",
-  "checkpoint_is_smoke_test": true,
-  "run_dir": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-smoke",
-  "dataset_statistics_path": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-smoke/dataset_statistics.json",
+  "checkpoint_path": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/final_model/pytorch_model.pt",
+  "checkpoint_is_smoke_test": false,
+  "run_dir": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1",
+  "dataset_statistics_path": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/dataset_statistics.json",
+  "intermediate_checkpoints": [
+    "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/checkpoints/steps_2500_pytorch_model.pt",
+    "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/checkpoints/steps_5000_pytorch_model.pt",
+    "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/checkpoints/steps_7500_pytorch_model.pt",
+    "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/checkpoints/steps_10000_pytorch_model.pt"
+  ],
+  "training_run": {
+    "run_id": "g1-longhorizon-oft-v1",
+    "max_train_steps": 10000,
+    "micro_batch": 2,
+    "gradient_accumulation_steps": 16,
+    "effective_batch": 32,
+    "optimizer": "bitsandbytes PagedAdamW8bit",
+    "precision": "bf16",
+    "gradient_checkpointing": true,
+    "deepspeed": false,
+    "attn_implementation": "sdpa",
+    "wall_clock": "6h22m25s",
+    "sec_per_step": 2.29,
+    "peak_vram_torch_gb": 10.57,
+    "peak_vram_nvidia_smi_mib": 14855,
+    "gpu": "NVIDIA GeForce RTX 4080 (16 GB)",
+    "loss_first_500_mean": 0.2957,
+    "loss_last_500_mean": 0.0462,
+    "loss_min": 0.0099,
+    "nan_or_oom": false,
+    "starvla_commit_at_launch": "71e5b264873b3763b9587a5bc8fa604a4cf7a34d",
+    "loss_curve_csv": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/loss_curve.csv",
+    "training_log": "/home/jren313/research/starvla_rl/checkpoints/g1-longhorizon-oft-v1/training.log"
+  },
 
   "action_dim": 30,
   "action_horizon": 30,
@@ -108,7 +137,8 @@
         "why_the_bridge_may_not_apply": "The bridge drives a whole-body 41-DOF config, not the fixed-base variant the piston task uses, and it seeds target from current joint_pos rather than writing a default-pose offset for all 53 DOFs.",
         "to_close": "Obtain inspire6_to_urdf12 from the GR00T-WBC-Bridge repo or replay_piston_csv.py and record the ratio. DO NOT reconstruct it by guessing. If coupling was used, the fix is a 12-element expansion in the deployment adapter only; the SFT checkpoint and the 30-D action space are unaffected either way."
       },
-      "caveat": "If the demonstrations were recorded with coupling, the deployed hand curls less at the middle phalanges than the demonstrator's did. A visual/contact-geometry difference confined to the fingers - not a wrong action space, units, or joint assignment. The dataset only ever commanded 6 DOF per hand, so no SFT signal exists for the other 6 regardless.",
+      "risk": "DEPLOYMENT FIDELITY / CONTACT RISK - not cosmetic. If the demonstrations were recorded with coupling, the deployed hand curls less at the middle phalanges than the demonstrator's did, changing where the fingertips sit and how the distal phalanges make contact. This can affect fingertip pose relative to the piston and tube, grasp stability and slip under load, and contact timing/normals/force distribution during insertion. For a contact-rich bimanual insertion task this is a substantive closed-loop risk; evaluate deliberately and watch for slip, mis-seating, or insertion failures that correlate with hand pose rather than arm trajectory.",
+      "contract_impact": "NONE. The 30-D action space, units, horizon, normalization and joint assignment are unaffected. This is an execution-fidelity gap between the simulated hand and the demonstrated hand, not an interface error. The dataset only ever commanded 6 DOF per hand, so no SFT signal exists for the other 6 regardless.",
       "note_on_config_yaml": "The asset config.yaml records convert_mimic_joints_to_normal_joints:false, implying the source URDF had mimic joints. The converted USD that the sim loads has none, so that flag is not evidence of runtime coupling.",
       "corroboration": "IsaacLab's own G1 Inspire task lists exactly these 24 as hand_joint_names ('All the drive and mimic joints, total 24 joints', num_hand_joints=24) and its retargeter solves all 12 per hand as independent DOFs."
     },
@@ -166,7 +196,7 @@
   "unresolved": [
     "No closed-loop evaluation was performed. No policy-quality claim is made.",
     "BLOCKING closed-loop: the piston task's front_camera renders 105.5 deg HFOV vs the dataset's 69 deg. Requires a sim-side camera cfg change in unitree_sim_isaaclab (not applied here). This is the one hard blocker for evaluation.",
-    "Fidelity caveat (not blocking): the 12 Inspire intermediate/distal DOFs are held at 0.0. Verified independently driven with no coupling in the USD, so this is the correct default, but the fingers will not curl at the middle joint.",
+    "OPEN CONTACT/GRASP RISK (does not block launching evaluation, but must be watched): the 12 Inspire intermediate/distal DOFs are held at 0.0. Verified independently driven with no coupling in the USD, so 0.0 is a valid default - but whether the original replay used 0.0 or a 6->12 coupling is unproven. Different intermediate-joint motion changes fingertip pose, grasp stability, and contact behavior during manipulation. The 30-D action contract is unaffected.",
     "Whether the RLinf/IsaacLab controller requires proprioceptive state input. If yes, wire StateActionDropout before enabling state.",
     "navigate_command and base_height are constant in this dataset, so the policy gets no learning signal for locomotion or torso height. RL must not assume these are controllable from SFT.",
     "Zero-order hold (2 env steps per action) is specified but NOT implemented: there is no action-repeat mechanism in rlinf/envs/. Must be added at IsaaclabBaseEnv.chunk_step before closed-loop evaluation."

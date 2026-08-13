@@ -212,11 +212,24 @@ Two further reasons not to assume the bridge path applies to this dataset:
    an offset from the **default pose** for all 53 DOFs every step. These are different
    write strategies, so the bridge's behaviour does not transfer unexamined.
 
-**Status: documented fidelity caveat, not a correctness blocker** (as directed). Command
-0.0 for the 12 joints. If the demonstrations were in fact recorded with coupling applied,
-the deployed hand will curl less at the middle phalanges than the demonstrator's did —
-a visual/contact-geometry difference confined to the fingers, not a wrong action space,
-wrong units, or wrong joint assignment.
+**Status: open deployment fidelity / contact risk. The 30-D action contract itself
+remains valid.** Command 0.0 for the 12 joints, but do not treat the gap as cosmetic.
+
+If the demonstrations were recorded with coupling applied, the deployed hand will curl
+less at the middle phalanges than the demonstrator's did. That changes **where the
+fingertips actually sit** and **how the distal phalanges make contact**, so it can affect:
+
+- fingertip pose relative to the piston and the tube,
+- grasp stability, and whether the grasp slips under load,
+- contact timing, contact normals, and force distribution during insertion.
+
+For a contact-rich bimanual insertion task that is a substantive closed-loop risk, not a
+visual difference. Evaluate it deliberately: watch for slip, mis-seating, or insertion
+failures that correlate with hand pose rather than arm trajectory.
+
+What is *not* at risk: the action space, units, horizon, normalization, and joint
+assignment are unaffected. This is an execution-fidelity gap between the simulated hand
+and the demonstrated hand, not an error in the interface the policy was trained against.
 
 To close this properly, obtain `inspire6_to_urdf12` from the `GR00T-WBC-Bridge` repo (or
 `replay_piston_csv.py`) and record the ratio here. **Do not reconstruct it by guessing.**
@@ -355,7 +368,7 @@ image. `left_wrist_camera` / `right_wrist_camera` must not be fed.
 | dims 26–29 (base/nav) | **RESOLVED** — drop; no DOF, constant in data, fixed-base task |
 | 12 leg + 3 waist DOFs | **RESOLVED** — hold at default 0.0 |
 | 12 Inspire intermediate/distal DOFs — *is 0.0 valid?* | **RESOLVED** — independently driven (stiffness 20.0, no mimic/tendon in the USD); 0.0 reaches the default pose |
-| 12 Inspire intermediate/distal DOFs — *did the replay use 0.0?* | **NOT PROVEN** — a `inspire6_to_urdf12` coupling exists in `GR00T-WBC-Bridge` but that package and `replay_piston_csv.py` are absent here; the dataset records only 6 DOF/hand so it cannot arbitrate. Documented fidelity caveat. |
+| 12 Inspire intermediate/distal DOFs — *did the replay use 0.0?* | **NOT PROVEN — open contact/grasp risk.** A `inspire6_to_urdf12` coupling exists in `GR00T-WBC-Bridge` but that package and `replay_piston_csv.py` are absent here; the dataset records only 6 DOF/hand so it cannot arbitrate. May affect fingertip pose, grasp stability, and contact behavior. Action contract unaffected. |
 | `ego_view` → `front_camera` | **RESOLVED** — same mount, confirmed by EGOCAM |
 | Piston camera intrinsics | **MISMATCH** — 105.5° vs 69° HFOV; sim-side fix required |
 | Preprocessing | **RESOLVED** — 240×424 → 224×224 squash, no crop, jitter off |

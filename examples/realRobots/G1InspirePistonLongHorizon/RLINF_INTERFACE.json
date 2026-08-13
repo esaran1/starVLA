@@ -94,10 +94,21 @@
     },
     "hold_at_default_inspire_intermediate_distal": {
       "articulation_indices": [39, 40, 41, 42, 44, 45, 46, 47, 49, 50, 51, 52],
-      "status": "RESOLVED - verified against the USD the piston task loads",
-      "finding": "These are independently driven PhysicsRevoluteJoints (PhysicsDriveAPI:angular, stiffness 20.0, damping 0.01745, maxForce 50-150). An exhaustive stage scan found 0 mimic attributes and no mimic/tendon schema. They are NOT passive and NOT coupled in this asset.",
-      "resolution": "Command 0.0. With use_default_offset=True and q_default=0.0 for all 24 Inspire joints, 0.0 commands exactly the default pose.",
-      "caveat": "Fingers will curl at the proximal knuckle and stay straight at the middle joint. This is a fidelity limitation, not a correctness error: the dataset only ever commanded 6 DOF per hand, so no SFT signal exists for the other 6.",
+      "status": "PARTIALLY RESOLVED - 0.0 is a valid command (proven); that the original replay used 0.0 is NOT proven",
+      "is_zero_valid": {
+        "answer": "YES - proven",
+        "finding": "These are independently driven PhysicsRevoluteJoints (PhysicsDriveAPI:angular, stiffness 20.0, damping 0.01745, maxForce 50-150). An exhaustive stage scan found 0 mimic attributes and no mimic/tendon schema. They are NOT passive and NOT coupled in this asset.",
+        "resolution": "Command 0.0. With use_default_offset=True and q_default=0.0 for all 24 Inspire joints, 0.0 commands exactly the default pose."
+      },
+      "did_the_replay_use_zero": {
+        "answer": "NOT PROVEN - documented fidelity caveat, not a correctness blocker",
+        "counter_evidence": "A 6->12 coupling expansion exists in this ecosystem: GR00T-WBC-Bridge/scripts/run_isaac_sim_loop.py calls Dex3InspireMapper.inspire6_to_urdf12() on each hand, documented as 'inspire 41 DOF, 26 upper body (7+6+7+6), URDF coupling'.",
+        "why_unresolved": "replay_piston_csv.py (named as the dataset author in meta/info.json) is absent from this machine, and gr00t_wbc_bridge is an optional install.sh --with-bridge clone that was never fetched. The mapper implementation and URDF_HAND_JOINTS_* constants are therefore unavailable.",
+        "why_the_dataset_cannot_arbitrate": "It records exactly 6 hand DOF per hand in both observation.state and action; the 12 URDF joints appear nowhere. get_robot_inspire_joint_states gathers only the 12 PROXIMAL indices [36,37,35,34,48,38,31,32,30,29,43,33]. Proximal joints track their own commands at corr 0.993-0.997 under either hypothesis, so the correlation carries no discriminating information.",
+        "why_the_bridge_may_not_apply": "The bridge drives a whole-body 41-DOF config, not the fixed-base variant the piston task uses, and it seeds target from current joint_pos rather than writing a default-pose offset for all 53 DOFs.",
+        "to_close": "Obtain inspire6_to_urdf12 from the GR00T-WBC-Bridge repo or replay_piston_csv.py and record the ratio. DO NOT reconstruct it by guessing. If coupling was used, the fix is a 12-element expansion in the deployment adapter only; the SFT checkpoint and the 30-D action space are unaffected either way."
+      },
+      "caveat": "If the demonstrations were recorded with coupling, the deployed hand curls less at the middle phalanges than the demonstrator's did. A visual/contact-geometry difference confined to the fingers - not a wrong action space, units, or joint assignment. The dataset only ever commanded 6 DOF per hand, so no SFT signal exists for the other 6 regardless.",
       "note_on_config_yaml": "The asset config.yaml records convert_mimic_joints_to_normal_joints:false, implying the source URDF had mimic joints. The converted USD that the sim loads has none, so that flag is not evidence of runtime coupling.",
       "corroboration": "IsaacLab's own G1 Inspire task lists exactly these 24 as hand_joint_names ('All the drive and mimic joints, total 24 joints', num_hand_joints=24) and its retargeter solves all 12 per hand as independent DOFs."
     },

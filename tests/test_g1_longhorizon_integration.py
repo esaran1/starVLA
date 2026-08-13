@@ -307,9 +307,11 @@ def test_inspire_intermediate_distal_resolution_is_evidence_backed(rlinf):
     independently driven with no mimic/tendon — not as a blind zero-fill."""
     d = rlinf["isaaclab_action_mapping"]["hold_at_default_inspire_intermediate_distal"]
     assert len(d["articulation_indices"]) == 12
-    assert d["status"].startswith("RESOLVED")
-    # the identity that makes 0.0 correct
+    # 0.0 is a proven-valid command...
+    assert d["is_zero_valid"]["answer"].startswith("YES")
     assert rlinf["isaaclab_action_mapping"]["default_pose_all_zero"] is True
+    # ...but whether the original replay used it is explicitly NOT claimed.
+    assert d["did_the_replay_use_zero"]["answer"].startswith("NOT PROVEN")
 
 
 def test_dataset_hand_commands_are_within_inspire_joint_limits(rlinf):

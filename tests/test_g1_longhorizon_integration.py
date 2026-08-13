@@ -214,3 +214,55 @@ def test_camera_contract_records_the_intrinsics_mismatch(rlinf):
     mm = cam["INTRINSICS_MISMATCH"]
     assert mm["required_focal_mm"] == 14.55
     assert mm["piston_task_focal_mm"] != mm["required_focal_mm"]
+
+
+def test_policy_norm_processor_binds_video_metadata(data_cfg):
+    """Serving a data config whose transform() includes video augmentation must
+    not raise 'Video key ego_view not found in dataset metadata'.
+
+    dataset_statistics.json carries no video info, so _build_dataset_metadata
+    has to synthesize schema-valid entries for the config's video_keys.
+    """
+    import deployment.model_server.policy_norm_processor as P
+
+    fields = ("mean", "std", "min", "max", "q01", "q99")
+    stats = {
+        "action": {k: [0.0] * 30 for k in fields},
+        "state": {k: [0.0] * 29 for k in fields},
+    }
+    md = P._build_dataset_metadata(
+        stats,
+        "new_embodiment",
+        action_keys=data_cfg.action_keys,
+        state_keys=data_cfg.state_keys,
+        action_key_dims=data_cfg.action_key_dims,
+        state_key_dims=data_cfg.state_key_dims,
+        video_keys=data_cfg.video_keys,
+        video_resolution=(224, 224),
+    )
+    assert "ego_view" in md.modalities.video
+    assert md.modalities.video["ego_view"].resolution == (224, 224)
+    # binding must succeed — this is the call that used to raise
+    tf = data_cfg.transform()
+    tf.set_metadata(md)
+    tf.eval()
+
+
+def test_build_dataset_metadata_video_default_is_unchanged(data_cfg):
+    """Callers that pass no video_keys keep the previous empty-video behavior."""
+    import deployment.model_server.policy_norm_processor as P
+
+    fields = ("mean", "std", "min", "max", "q01", "q99")
+    stats = {
+        "action": {k: [0.0] * 30 for k in fields},
+        "state": {k: [0.0] * 29 for k in fields},
+    }
+    md = P._build_dataset_metadata(
+        stats,
+        "new_embodiment",
+        data_cfg.action_keys,
+        data_cfg.state_keys,
+        data_cfg.action_key_dims,
+        data_cfg.state_key_dims,
+    )
+    assert md.modalities.video == {}

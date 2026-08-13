@@ -151,6 +151,10 @@ def _build_dataset_metadata(
     state_keys: Sequence[str],
     action_key_dims: Optional[Dict[str, int]] = None,
     state_key_dims: Optional[Dict[str, int]] = None,
+    video_keys: Sequence[str] = (),
+    video_resolution: Sequence[int] = (224, 224),
+    video_fps: float = 30.0,
+    video_channels: int = 3,
 ) -> DatasetMetadata:
     """Convert the *combined* stats arrays from ``dataset_statistics.json``
     back into a per-subkey :class:`DatasetMetadata` matching what the training
@@ -219,8 +223,25 @@ def _build_dataset_metadata(
 
     action_stats, action_meta = _split_combined(action_combined, action_keys, action_key_dims)
 
+    # Populate video modality metadata for any video sub-keys referenced by the
+    # training-time transform pipeline. dataset_statistics.json carries no video
+    # info, but data_configs whose transform() includes video augmentation (e.g.
+    # VideoColorJitter) call set_metadata on those transforms, and VideoTransform
+    # raises "Video key <k> not found in dataset metadata" when the sub-key is
+    # absent. Un-normalization never touches video (VideoTransforms are not
+    # InvertibleModalityTransform, so unapply() skips them), so these values only
+    # need to be schema-valid, not exact.
+    video_meta: Dict[str, Any] = {}
+    for full_key in video_keys:
+        subkey = full_key.split(".", 1)[1] if "." in full_key else full_key
+        video_meta[subkey] = {
+            "resolution": (int(video_resolution[0]), int(video_resolution[1])),
+            "channels": int(video_channels),
+            "fps": float(video_fps),
+        }
+
     statistics: Dict[str, Any] = {"action": action_stats}
-    modalities: Dict[str, Any] = {"video": {}, "action": action_meta}
+    modalities: Dict[str, Any] = {"video": video_meta, "action": action_meta}
     if state_combined:
         state_stats, state_meta = _split_combined(state_combined, state_keys, state_key_dims)
         statistics["state"] = state_stats
@@ -277,6 +298,17 @@ class PolicyNormProcessor:
         self._data_config = ROBOT_TYPE_CONFIG_MAP[robot_type]
         self._action_keys: List[str] = list(self._data_config.action_keys)
         self._state_keys: List[str] = list(getattr(self._data_config, "state_keys", []))
+        self._video_keys: List[str] = list(getattr(self._data_config, "video_keys", []))
+
+        # Training image size -> a schema-valid video resolution for transforms
+        # whose set_metadata reads it (un-normalization itself never uses video).
+        # Falls back to a square default when the cfg does not specify a size.
+        _vla_cfg = (cfg.get("datasets", {}) or {}).get("vla_data", {}) or {}
+        _img_size = _vla_cfg.get("obs_image_size") or _vla_cfg.get("image_size")
+        if isinstance(_img_size, (list, tuple)) and len(_img_size) >= 2:
+            self._video_resolution = (int(_img_size[-2]), int(_img_size[-1]))
+        else:
+            self._video_resolution = (224, 224)
 
         # 2) Build training-time transform pipeline.
         transform = self._data_config.transform()
@@ -309,6 +341,8 @@ class PolicyNormProcessor:
             state_keys=self._state_keys,
             action_key_dims=self._action_key_dims,
             state_key_dims=self._state_key_dims,
+            video_keys=self._video_keys,
+            video_resolution=self._video_resolution,
         )
         self._transform.set_metadata(ds_meta)
         self._transform.eval()  # mark transforms as eval-mode

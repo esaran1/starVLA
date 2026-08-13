@@ -20,8 +20,8 @@ config_yaml=./examples/realRobots/G1InspirePistonLongHorizon/train_files/starvla
 run_root_dir=${RUN_ROOT_DIR:-/home/jren313/research/starvla_rl/checkpoints}
 run_id=${RUN_ID:-g1-longhorizon-oft-smoke}
 
-BATCH=${BATCH:-1}
-ACCUM=${ACCUM:-8}
+BATCH=${BATCH:-2}
+ACCUM=${ACCUM:-16}   # effective batch = BATCH * ACCUM = 32
 MAX_STEPS=${MAX_STEPS:-20}
 SAVE_EVERY=${SAVE_EVERY:-100000}
 EVAL_EVERY=${EVAL_EVERY:-500}

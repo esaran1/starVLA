@@ -66,6 +66,57 @@
   "language_key": "annotation.human.task_description",
   "language_original_key": "task_index",
   "task_string": "pick up the piston with the right hand, inject it into the tube held by the left hand, then move it over the hole plate.",
+  "task_string_sha256": "23c5ab23b8e8f7a903580bb14b32706c438100989ed45293e2415d87238e8062",
+  "task_string_length": 120,
+  "task_string_note": "VERBATIM, single task_index 0, identical across all 67 episodes. RLinf must send this byte-for-byte (lowercase 'pick', trailing period). Any rewording is out-of-distribution.",
+
+  "isaaclab_action_mapping": {
+    "_doc": "See ISAACLAB_MAPPING.md for evidence per row.",
+    "simulator_action_dim": 53,
+    "simulator_action_semantics": "JointPositionActionCfg(joint_names=['.*'], scale=1.0, use_default_offset=True) -> offset from default pose",
+    "default_pose_all_zero": true,
+    "conversion": "action_53[art_idx] = starvla_action_30[ds_dim]; identity because every default joint position is 0.0",
+    "ds_dim_to_articulation_index": {
+      "0": 11, "1": 15, "2": 19, "3": 21, "4": 23, "5": 25, "6": 27,
+      "7": 12, "8": 16, "9": 20, "10": 22, "11": 24, "12": 26, "13": 28,
+      "14": 31, "15": 32, "16": 30, "17": 29, "18": 43, "19": 33,
+      "20": 36, "21": 37, "22": 35, "23": 34, "24": 48, "25": 38
+    },
+    "dropped_ds_dims": {
+      "26": "base_height - no articulation DOF; fixed-base task; constant 0.76 in data",
+      "27": "nav_vx - no DOF; exactly 0.0 in all frames",
+      "28": "nav_vy - no DOF; exactly 0.0 in all frames",
+      "29": "nav_yaw - no DOF; exactly 0.0 in all frames"
+    },
+    "hold_at_default_articulation_indices": {
+      "legs": [0, 1, 3, 4, 6, 7, 9, 10, 13, 14, 17, 18],
+      "waist": [2, 5, 8]
+    },
+    "UNRESOLVED_articulation_indices": {
+      "inspire_intermediate_distal": [39, 40, 41, 42, 44, 45, 46, 47, 49, 50, 51, 52],
+      "reason": "Physically coupled to the proximal joints on the real Inspire hand, but ACTCFG actuates all 53 DOFs. No coupling ratio found in the simulator Python sources (would live in the robot USD). Writing 0.0 forces fingers straight while the proximal curls. DO NOT GUESS A RATIO."
+    }
+  },
+
+  "isaaclab_camera_mapping": {
+    "_doc": "See ISAACLAB_MAPPING.md.",
+    "ego_view_corresponds_to": "front_camera",
+    "shared_mount_prim": "/World/envs/env_.*/Robot/d435_link/front_cam",
+    "evidence": "g1_redball_eval overlay states the dataset ego_view is the D435 color stream at 424x240 and configures front_camera accordingly.",
+    "wrist_cameras_used": false,
+    "INTRINSICS_MISMATCH": {
+      "dataset_hfov_deg": 69.0,
+      "dataset_vfov_deg": 42.5,
+      "dataset_resolution": [240, 424],
+      "piston_task_hfov_deg": 105.5,
+      "piston_task_vfov_deg": 89.2,
+      "piston_task_resolution": [480, 640],
+      "piston_task_focal_mm": 7.6,
+      "required_focal_mm": 14.55,
+      "impact": "The piston task renders a much wider view than any training frame; the policy would receive out-of-distribution imagery.",
+      "fix_location": "unitree_sim_isaaclab piston scene cfg (NOT StarVLA). Not applied - outside this task's scope."
+    }
+  },
 
   "dataset": "birbirll/g1-inspire-piston-longhorizon",
   "dataset_revision": "80fb5a0bbcaf806f5b2cc848fc722f8e005a6830",

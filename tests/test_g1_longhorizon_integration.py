@@ -155,3 +155,62 @@ def test_q99_normalization_roundtrip_including_degenerate_dims():
     back = n.inverse(z) if hasattr(n, "inverse") else None
     if back is not None:
         assert torch.allclose(back, x, atol=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# IsaacLab handoff contract (ISAACLAB_MAPPING.md / RLINF_INTERFACE.json).
+# These guard the 30-D -> 53-D mapping against silent drift.
+# ---------------------------------------------------------------------------
+RLINF_JSON = EX / "RLINF_INTERFACE.json"
+
+
+@pytest.fixture(scope="module")
+def rlinf():
+    return json.loads(RLINF_JSON.read_text())
+
+
+def test_rlinf_contract_matches_training_config(rlinf, yaml_cfg):
+    assert rlinf["action_dim"] == yaml_cfg.framework.action_model.action_dim
+    assert rlinf["action_horizon"] == yaml_cfg.framework.action_model.action_horizon
+    assert rlinf["state_enabled"] is False
+    assert rlinf["action_normalization_key"] == "new_embodiment"
+    assert rlinf["control_frequency_hz"] == 50
+
+
+def test_action_mapping_is_injective_and_complete(rlinf):
+    m = rlinf["isaaclab_action_mapping"]["ds_dim_to_articulation_index"]
+    # the 26 joint-backed dims map 1:1 into distinct articulation slots
+    assert sorted(int(k) for k in m) == list(range(26))
+    assert len(set(m.values())) == 26
+    assert all(0 <= v < 53 for v in m.values())
+
+
+def test_mapped_dropped_and_held_dofs_partition_53(rlinf):
+    am = rlinf["isaaclab_action_mapping"]
+    mapped = set(am["ds_dim_to_articulation_index"].values())
+    held = set(am["hold_at_default_articulation_indices"]["legs"]) | set(
+        am["hold_at_default_articulation_indices"]["waist"]
+    )
+    unresolved = set(am["UNRESOLVED_articulation_indices"]["inspire_intermediate_distal"])
+    assert not (mapped & held) and not (mapped & unresolved) and not (held & unresolved)
+    assert mapped | held | unresolved == set(range(53)), "every articulation DOF must be accounted for"
+    # dims 26-29 carry no DOF and must be dropped, not written
+    assert sorted(int(k) for k in am["dropped_ds_dims"]) == [26, 27, 28, 29]
+
+
+def test_task_string_is_verbatim(rlinf):
+    import hashlib
+
+    s = rlinf["task_string"]
+    assert hashlib.sha256(s.encode()).hexdigest() == rlinf["task_string_sha256"]
+    assert len(s) == rlinf["task_string_length"] == 120
+
+
+def test_camera_contract_records_the_intrinsics_mismatch(rlinf):
+    cam = rlinf["isaaclab_camera_mapping"]
+    assert cam["ego_view_corresponds_to"] == "front_camera"
+    assert cam["wrist_cameras_used"] is False
+    # the mismatch must stay recorded until the sim-side fix lands
+    mm = cam["INTRINSICS_MISMATCH"]
+    assert mm["required_focal_mm"] == 14.55
+    assert mm["piston_task_focal_mm"] != mm["required_focal_mm"]
